@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Смены</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;700;900&display=swap');
+
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #22222e;
+    --border: #2e2e3e;
+    --text: #f0f0f5;
+    --muted: #6b6b80;
+    --day:   #3b82f6;
+    --day-bg: rgba(59,130,246,0.15);
+    --night: #8b5cf6;
+    --night-bg: rgba(139,92,246,0.15);
+    --eve:  #f59e0b;
+    --eve-bg: rgba(245,158,11,0.15);
+    --off:   #1a1a22;
+    --off-border: #2e2e3e;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Geologica', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 16px 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+  }
+  .header h1 span { color: var(--day); }
+
+  /* ── MONTH NAV ── */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    gap: 8px;
+  }
+  .month-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+  }
+  .month-nav button:active { background: var(--surface2); }
+  .month-title {
+    font-size: 17px;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: -0.3px;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+
+  /* ── CALENDAR ── */
+  .calendar-wrap { padding: 0 16px; }
+
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .weekday {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    padding: 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .weekday.weekend { color: #ef4444; opacity: .7; }
+
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .day-cell {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    border: 1.5px solid transparent;
+    transition: transform .1s, border-color .15s;
+    user-select: none;
+  }
+  .day-cell:active { transform: scale(.92); }
+  .day-cell.empty { cursor: default; }
+
+  .day-cell.off {
+    background: var(--off);
+    border-color: var(--off-border);
+    color: var(--muted);
+  }
+  .day-cell.day-shift {
+    background: var(--day-bg);
+    border-color: var(--day);
+    color: var(--day);
+    font-weight: 700;
+  }
+  .day-cell.night-shift {
+    background: var(--night-bg);
+    border-color: var(--night);
+    color: var(--night);
+    font-weight: 700;
+  }
+  .day-cell.evening-shift {
+    background: var(--eve-bg);
+    border-color: var(--eve);
+    color: var(--eve);
+    font-weight: 700;
+  }
+  .day-cell.today-ring::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 12px;
+    border: 2px solid #fff;
+    opacity: .25;
+    pointer-events: none;
+  }
+
+  .shift-label {
+    position: absolute;
+    bottom: 3px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    opacity: .85;
+  }
+
+  /* ── SETUP MODE ── */
+  .setup-banner {
+    margin: 0 16px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .setup-banner p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .setup-steps {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .step-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid;
+    transition: opacity .15s, transform .1s;
+    font-family: 'Geologica', sans-serif;
+  }
+  .step-btn:active { transform: scale(.95); }
+  .step-btn.active-step { opacity: 1; }
+  .step-btn.done-step { opacity: .5; }
+  .step-btn.pending-step { opacity: .35; }
+
+  .step-btn.off-btn    { background: transparent; border-color: var(--muted); color: var(--muted); }
+  .step-btn.day-btn    { background: var(--day-bg); border-color: var(--day); color: var(--day); }
+  .step-btn.night-btn  { background: var(--night-bg); border-color: var(--night); color: var(--night); }
+  .step-btn.eve-btn    { background: var(--eve-bg); border-color: var(--eve); color: var(--eve); }
+
+  /* ── BOTTOM BAR ── */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    gap: 10px;
+  }
+  .btn-primary {
+    flex: 1;
+    padding: 13px;
+    border-radius: 12px;
+    border: none;
+    background: var(--day);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Geologica', sans-serif;
+    transition: opacity .15s;
+  }
+  .btn-primary:active { opacity: .8; }
+  .btn-secondary {
+    padding: 13px 18px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Geologica', sans-serif;
+    transition: opacity .15s;
+  }
+  .btn-secondary:active { opacity: .6; }
+
+  .spacer { height: 80px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    top: 20px; left: 50%; transform: translateX(-50%) translateY(-80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── NEXT SHIFT CARD ── */
+  .next-shift-card {
+    margin: 0 16px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .next-shift-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .next-shift-value { font-size: 16px; font-weight: 700; }
+  .next-shift-time  { font-size: 13px; color: var(--muted); }
+  .notif-toggle {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted);
+  }
+  .toggle-track {
+    width: 36px; height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-track.on { background: var(--day); }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left .2s;
+  }
+  .toggle-track.on .toggle-thumb { left: 18px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Мои <span>смены</span></h1>
+  <div style="font-size:11px;color:var(--muted);text-align:right;line-height:1.4">
+    <span id="header-mode">просмотр</span>
+  </div>
+</div>
+
+<!-- Next shift -->
+<div class="next-shift-card" id="next-shift-card">
+  <div>
+    <div class="next-shift-label">Следующая смена</div>
+    <div class="next-shift-value" id="next-shift-value">—</div>
+    <div class="next-shift-time" id="next-shift-time"></div>
+  </div>
+  <div class="notif-toggle">
+    <span>–12ч</span>
+    <div class="toggle-track" id="notif-toggle" onclick="toggleNotif()">
+      <div class="toggle-thumb"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Setup banner -->
+<div class="setup-banner" id="setup-banner" style="display:none">
+  <p id="setup-hint">Выберите шаг разметки:</p>
+  <div class="setup-steps" id="setup-steps"></div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--day)"></div>День</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--night)"></div>Ночь</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--eve)"></div>Вечер</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--border)"></div>Выходной</div>
+</div>
+
+<!-- Month nav -->
+<div class="month-nav">
+  <button onclick="changeMonth(-1)">‹</button>
+  <div class="month-title" id="month-title"></div>
+  <button onclick="changeMonth(1)">›</button>
+</div>
+
+<!-- Calendar -->
+<div class="calendar-wrap">
+  <div class="weekdays">
+    <div class="weekday">Пн</div>
+    <div class="weekday">Вт</div>
+    <div class="weekday">Ср</div>
+    <div class="weekday">Чт</div>
+    <div class="weekday">Пт</div>
+    <div class="weekday weekend">Сб</div>
+    <div class="weekday weekend">Вс</div>
+  </div>
+  <div class="days-grid" id="days-grid"></div>
+</div>
+
+<div class="spacer"></div>
+
+<!-- Bottom bar -->
+<div class="bottom-bar" id="bottom-bar">
+  <button class="btn-secondary" onclick="toggleSetupMode()">✏️ Разметить</button>
+  <button class="btn-primary" id="main-btn" onclick="mainAction()">Сохранить</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+const SHIFTS = { off:'off', day:'day-shift', night:'night-shift', eve:'evening-shift' };
+const SHIFT_NAMES = { off:'Выходной', 'day-shift':'День', 'night-shift':'Ночь', 'evening-shift':'Вечер' };
+const SHIFT_TIMES = { 'day-shift':'08:00–16:00', 'night-shift':'00:00–08:00', 'evening-shift':'16:00–00:00' };
+const SHIFT_HOURS = { 'day-shift':8, 'night-shift':0, 'evening-shift':16 };
+
+let schedule = JSON.parse(localStorage.getItem('shifts') || '{}');
+let notifOn   = localStorage.getItem('notif') === '1';
+let setupMode = false;
+let currentStep = null; // 'off' | 'day-shift' | 'night-shift' | 'evening-shift'
+let now = new Date();
+let viewYear  = now.getFullYear();
+let viewMonth = now.getMonth();
+
+const STEPS = [
+  { key:'off',           label:'Выходные',   cls:'off-btn'   },
+  { key:'day-shift',     label:'День',        cls:'day-btn'   },
+  { key:'night-shift',   label:'Ночь',        cls:'night-btn' },
+  { key:'evening-shift', label:'Вечер',       cls:'eve-btn'   },
+];
+
+// ── INIT TG ──
+let tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ── RENDER ──
+function key(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+function renderCalendar(){
+  const grid = document.getElementById('days-grid');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const offset   = firstDay === 0 ? 6 : firstDay - 1;        // Mon-based
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+
+  for(let i=0;i<offset;i++){
+    const e = document.createElement('div');
+    e.className = 'day-cell empty';
+    grid.appendChild(e);
+  }
+
+  for(let d=1;d<=daysInMonth;d++){
+    const k = key(viewYear, viewMonth, d);
+    const shift = schedule[k] || 'off';
+    const cell  = document.createElement('div');
+    cell.className = `day-cell ${shift}`;
+    cell.dataset.key = k;
+
+    // today ring
+    const today = new Date();
+    if(d===today.getDate() && viewMonth===today.getMonth() && viewYear===today.getFullYear()){
+      cell.classList.add('today-ring');
+    }
+
+    cell.innerHTML = `${d}${shift!=='off'?`<span class="shift-label">${labelFor(shift)}</span>`:''}`;
+    cell.addEventListener('click', ()=>onDayClick(k, cell));
+    grid.appendChild(cell);
+  }
+
+  // month title
+  document.getElementById('month-title').textContent =
+    new Date(viewYear, viewMonth,1).toLocaleString('ru',{month:'long',year:'numeric'});
+
+  updateNextShift();
+}
+
+function labelFor(s){
+  if(s==='day-shift')     return 'Д';
+  if(s==='night-shift')   return 'Н';
+  if(s==='evening-shift') return 'В';
+  return '';
+}
+
+function onDayClick(k, cell){
+  if(!setupMode || !currentStep) return;
+  const cur = schedule[k] || 'off';
+  schedule[k] = (cur === currentStep) ? 'off' : currentStep;
+  saveAndRender();
+  showToast(schedule[k]==='off'?'Снято':'Отмечено ✓');
+}
+
+function saveAndRender(){
+  localStorage.setItem('shifts', JSON.stringify(schedule));
+  renderCalendar();
+}
+
+// ── SETUP MODE ──
+function toggleSetupMode(){
+  setupMode = !setupMode;
+  currentStep = setupMode ? 'off' : null;
+  document.getElementById('setup-banner').style.display = setupMode ? '' : 'none';
+  document.getElementById('header-mode').textContent = setupMode ? '✏️ режим разметки' : 'просмотр';
+  document.getElementById('main-btn').textContent = setupMode ? 'Готово' : 'Сохранить';
+  if(setupMode) renderSteps();
+}
+
+function renderSteps(){
+  const wrap = document.getElementById('setup-steps');
+  wrap.innerHTML = '';
+  STEPS.forEach(s=>{
+    const btn = document.createElement('button');
+    btn.className = `step-btn ${s.cls} ${currentStep===s.key?'active-step':'pending-step'}`;
+    btn.textContent = s.label;
+    btn.onclick = ()=>selectStep(s.key);
+    wrap.appendChild(btn);
+  });
+  document.getElementById('setup-hint').textContent =
+    `Тапайте числа — отмечайте «${STEPS.find(x=>x.key===currentStep)?.label}»`;
+}
+
+function selectStep(k){
+  currentStep = k;
+  renderSteps();
+}
+
+function mainAction(){
+  if(setupMode){ toggleSetupMode(); showToast('График сохранён 💾'); }
+  else { showToast('График уже сохранён'); }
+}
+
+// ── NEXT SHIFT ──
+function updateNextShift(){
+  const today = new Date();
+  let found = null;
+  for(let offset=0; offset<60; offset++){
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    const k = key(d.getFullYear(), d.getMonth(), d.getDate());
+    const s = schedule[k];
+    if(s && s !== 'off'){
+      found = { date: d, shift: s, key: k };
+      break;
+    }
+  }
+
+  const val  = document.getElementById('next-shift-value');
+  const time = document.getElementById('next-shift-time');
+
+  if(!found){ val.textContent='Нет смен'; time.textContent=''; return; }
+
+  const isToday = found.date.toDateString() === today.toDateString();
+  const isTomorrow = found.date.toDateString() === new Date(today.getTime()+86400000).toDateString();
+  const dayLabel = isToday?'Сегодня':isTomorrow?'Завтра':
+    found.date.toLocaleString('ru',{day:'numeric',month:'short'});
+
+  val.textContent  = `${dayLabel} — ${SHIFT_NAMES[found.shift]}`;
+  time.textContent = SHIFT_TIMES[found.shift] || '';
+
+  // color accent
+  const colors = {'day-shift':'var(--day)','night-shift':'var(--night)','evening-shift':'var(--eve)'};
+  val.style.color = colors[found.shift] || 'var(--text)';
+}
+
+// ── NOTIFICATIONS ──
+function toggleNotif(){
+  notifOn = !notifOn;
+  localStorage.setItem('notif', notifOn?'1':'0');
+  document.getElementById('notif-toggle').classList.toggle('on', notifOn);
+
+  if(notifOn){
+    if('Notification' in window){
+      Notification.requestPermission().then(p=>{
+        if(p==='granted'){ scheduleNotifications(); showToast('Уведомления включены 🔔'); }
+        else { showToast('Разрешите уведомления в браузере'); notifOn=false; }
+      });
+    } else {
+      showToast('Уведомления не поддерживаются');
+      notifOn = false;
+    }
+  } else {
+    showToast('Уведомления выключены');
+  }
+}
+
+function scheduleNotifications(){
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const today = new Date();
+  for(let offset=0; offset<30; offset++){
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    const k = key(d.getFullYear(), d.getMonth(), d.getDate());
+    const s = schedule[k];
+    if(s && s !== 'off'){
+      const shiftHour = SHIFT_HOURS[s];
+      const notifTime = new Date(d);
+      notifTime.setHours(shiftHour - 12, 0, 0, 0);
+      const ms = notifTime.getTime() - Date.now();
+      if(ms > 0){
+        setTimeout(()=>{
+          new Notification('Смена через 12 часов', {
+            body: `${SHIFT_NAMES[s]} — ${SHIFT_TIMES[s]}`,
+            icon: '/favicon.ico'
+          });
+        }, ms);
+      }
+    }
+  }
+}
+
+// ── MONTH NAV ──
+function changeMonth(dir){
+  viewMonth += dir;
+  if(viewMonth > 11){ viewMonth=0; viewYear++; }
+  if(viewMonth < 0){ viewMonth=11; viewYear--; }
+  renderCalendar();
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+// ── BOOT ──
+document.getElementById('notif-toggle').classList.toggle('on', notifOn);
+renderCalendar();
+</script>
+</body>
+</html>
